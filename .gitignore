@@ -1,0 +1,8 @@
+.idea/
+.vscode/
+*.docx
+text/
+output/
+**/__pycache__/
+**/.ipynb_checkpoints
+.DS_Store
