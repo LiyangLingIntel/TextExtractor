@@ -1,6 +1,6 @@
 import re
 import os
-from src.py.settings import resource_folder, cove_folder, output_folder, toc_folder, date_folder, faildate_folder
+from src.py.settings import cove_folder, output_folder, truncated_cove_folder, truncated_dd_folder
 from src.py.utils import roman_num, num_roman, find_txt_files
 
 from src.py.utils import split_sen, split_para, find_txt_files
@@ -47,63 +47,75 @@ if __name__ == '__main__':
 
     info_tool = InfoTools()
 
-    file_names = find_txt_files(cove_folder)
+    # file_names = find_txt_files(cove_folder)
     fail_list = []
 
     suc_counter = 0
     err_counter = 0
 
-    date_dict = {'month': [], 'quarter': [], 'annual': [], 'others': []}
+    year_file_dic = {}
+    for year in range(1996, 2007):
+        year_folder = os.path.join(truncated_cove_folder, str(year))
+        year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
-    for name in file_names:
+    for year, file_names in tuple(year_file_dic.items()):
 
-        print(name)
+        print(year)
 
-        with open(os.path.join(cove_folder, name), 'r') as f:
-            content = f.read()
-        paras = split_para(content)
+        date_dict = {'month': [], 'quarter': [], 'annual': [], 'others': []}
 
-        info_sens = []
-        date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
-        for para in paras.split('\n'):
-            sens = info_tool.get_duedate_sens(para)  # get a list
+        year_folder = os.path.join(truncated_cove_folder, str(year))
 
-            if sens:
-                if sens['month']:
-                    date_sens['month'].extend(sens['month'])
-                elif sens['quarter']:
-                    date_sens['quarter'].extend(sens['quarter'])
-                elif sens['annual']:
-                    date_sens['annual'].extend(sens['annual'])
-                elif sens['others']:
-                    date_sens['others'].extend(sens['others'])
+        for name in file_names:
 
-        if date_sens:
-            if date_sens.get('month'):
-                date_dict['month'].append((name, date_sens['month']))
-            elif date_sens.get('quarter'):
-                date_dict['quarter'].append((name, date_sens['quarter']))
-            elif date_sens.get('annual'):
-                date_dict['annual'].append((name, date_sens['annual']))
-            elif date_sens.get('others'):
-                date_dict['others'].append((name, date_sens['others']))
+            # print(name)
 
-    date_book = xlwt.Workbook()
-    for key in date_dict.keys():
+            with open(os.path.join(year_folder, name), 'r') as f:
+                content = f.read()
+            paras = split_para(content)
 
-        print(f'{key}: {len(date_dict[key])}')
+            info_sens = []
+            date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
+            for para in paras.split('\n'):
+                sens = info_tool.get_duedate_sens(para)  # get a list
 
-        file_extractions = date_dict[key]
-        if not file_extractions:
-            continue
+                if sens:
+                    if sens['month']:
+                        date_sens['month'].extend(sens['month'])
+                    elif sens['quarter']:
+                        date_sens['quarter'].extend(sens['quarter'])
+                    elif sens['annual']:
+                        date_sens['annual'].extend(sens['annual'])
+                    elif sens['others']:
+                        date_sens['others'].extend(sens['others'])
 
-        sheet = date_book.add_sheet(key)
-        for i in range(len(file_extractions)):
-            sheet.write(i, 0, file_extractions[i][0])
-            for j in range(len(file_extractions[i][1])):
-                sheet.write(i, j+1, file_extractions[i][1][j])
+            if date_sens:
+                if date_sens.get('month'):
+                    date_dict['month'].append((name, date_sens['month']))
+                elif date_sens.get('quarter'):
+                    date_dict['quarter'].append((name, date_sens['quarter']))
+                elif date_sens.get('annual'):
+                    date_dict['annual'].append((name, date_sens['annual']))
+                elif date_sens.get('others'):
+                    date_dict['others'].append((name, date_sens['others']))
 
-    date_book.save(os.path.join(output_folder, 'due_date_v2.xls'))
+        date_book = xlwt.Workbook()
+        for key in date_dict.keys():
+
+            print(f'{year}: {key}, {len(date_dict[key])}')
+
+            file_extractions = date_dict[key]
+            if not file_extractions:
+                continue
+
+            sheet = date_book.add_sheet(key)
+            row = 0
+            for i in range(len(file_extractions)):
+                for j in range(len(file_extractions[i][1])):
+                    sheet.write(row, 0, file_extractions[i][0])
+                    sheet.write(row, 1, file_extractions[i][1][j])
+                    row += 1
+        date_book.save(os.path.join(truncated_dd_folder, f'due_date_{year}.xls'))
 
     print('due date finished!')
 
