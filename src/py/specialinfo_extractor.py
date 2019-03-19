@@ -170,7 +170,6 @@ if __name__ == '__main__':
                     elif sens['others']:
                         date_sens['others'].extend(sens['others'])
 
-            # if
 
             # write info into xls by each file iteration
             for date_type in sheet_names:
