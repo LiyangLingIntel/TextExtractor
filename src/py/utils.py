@@ -49,7 +49,6 @@ def indent_para(text: str) -> str:
 
 def split_sen(para: str) -> list:
 
-
     # Remove interference for sentence split from expression like No. 8
     dot_p = re.compile(r'(?<=No)\.\s+(?=\d)', re.IGNORECASE)
     para = dot_p.subn('-', para)[0]

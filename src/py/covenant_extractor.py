@@ -1,5 +1,6 @@
 import os
 import re
+import json
 
 from src.py.settings import resource_folder, cove_folder, toc_folder, text_folder, truncated_cove_folder
 from src.py.utils import find_txt_files, roman_num, num_roman
@@ -33,6 +34,10 @@ class ConvenantTools:
             """, re.VERBOSE)
 
         self.title_pat = re.compile(r"^\s*(ARTICLE|SECTION|Section)\s+(\d{1,2}|[IVX]{1,4})")
+
+        overlook_keys = ['AMENDED', 'AMENDMENT', 'RESTATED', 'revis',
+                         'amend', 'modif', 'restate', 'supplement', 'addendum']
+        self.amend_pat = re.compile('|'.join(overlook_keys), re.IGNORECASE)
 
     @timeout(5)
     def toc_extractor(self, text: str) -> str:
@@ -100,6 +105,25 @@ class ConvenantTools:
         """
         pass
 
+    def get_n_lines(self, n: int, lines: list) -> str:
+        # get first n lines of text
+        res = []
+        for line in lines:
+            if len(res) >= n:
+                break
+            line = re.subn(r'[-= ]{5,}', '', line.strip())[0]
+            if not line:
+                continue
+            res.append(line)
+        return ' '.join(res)
+
+    def is_original(self, key_text):
+
+        if re.search(self.amend_pat, key_text):
+            return False
+        else:
+            return True
+
 
 if __name__ == '__main__':
 
@@ -111,10 +135,6 @@ if __name__ == '__main__':
     """
 
     covenant_processor = ConvenantTools()
-    # example = 'final-0000012355-02-000023.txt'
-    overlook_keys = ['AMENDED', 'AMENDMENT', 'RESTATED', 'revis',
-                     'amend', 'modif', 'restate', 'supplement', 'addendum']
-    overlook_pat = re.compile('|'.join(overlook_keys), re.IGNORECASE)
 
     year_file_dic ={}
     for year in range(1996, 2007):
@@ -144,13 +164,17 @@ if __name__ == '__main__':
 
         for file_name in file_paths:
             try:
+                # define output dict
+                op_dict = {}        # keys: name, first_lines, is_original, covenant
+                op_dict['name'] = file_name.split('.')[0]
+
                 # 1. read file content and extract valid table of content
                 with open(os.path.join(year_folder, file_name), 'r') as f:
 
                     # filter amended contract
-                    if overlook_pat.search(''.join(f.readlines()[:20])):
-                        origin_files[year][1] -= 1
-                        continue
+                    op_dict['first_lines'] = covenant_processor.get_n_lines(5, f.readlines())
+                    op_dict['is_original'] = covenant_processor.is_original(op_dict['first_lines'])
+
                     f.seek(0)
                     text = f.read()
                     toc_text = covenant_processor.toc_extractor(text)
@@ -174,9 +198,11 @@ if __name__ == '__main__':
                 if not cove_section:
                     cove_problems[year] += 1
                     raise Exception('section extracting error')
+                op_dict['covenant'] = cove_section
 
-                with open(os.path.join(target_folder, file_name), 'w') as f:
-                    f.write(cove_section)
+                with open(os.path.join(target_folder, f"{op_dict['name']}.json"), 'w') as f:
+                    # f.write(cove_section)
+                    json.dump(op_dict, f)
 
                 suc_files[year] += 1
 
