@@ -137,8 +137,8 @@ if __name__ == '__main__':
     covenant_processor = ConvenantTools()
 
     year_file_dic ={}
-    for year in range(1996, 2007):
-        year_folder = os.path.join(text_folder, str(year), 'result')
+    for year in range(1996, 2018):
+        year_folder = os.path.join(text_folder, str(year))
         year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
     origin_files = {}
@@ -157,7 +157,7 @@ if __name__ == '__main__':
         cove_problems[year] = 0
         suc_files[year] = 0
 
-        year_folder = os.path.join(text_folder, str(year), 'result')
+        year_folder = os.path.join(text_folder, str(year))
         target_folder = os.path.join(truncated_cove_folder, str(year))
         if not os.path.exists(target_folder):
             os.makedirs(target_folder)

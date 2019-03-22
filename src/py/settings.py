@@ -5,7 +5,7 @@ import time
 os.chdir('/Users/leonling/workspace/Projects/Python/RA_NLP/')
 resource_folder = './text/'
 # text_folder = './text/publiccontracts/'
-text_folder = './text/truncate_result/'
+text_folder = './text/txt_result/'
 
 output_folder = './output/'
 cove_folder = './output/covenant/'
