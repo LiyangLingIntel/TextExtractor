@@ -248,6 +248,7 @@ if __name__ == '__main__':
                 break
 
         date_book.save(os.path.join(truncated_dd_folder, f'due_date_{year}.xls'))
+        del date_book
 
     print('due date finished!')
     print(date_dict)
