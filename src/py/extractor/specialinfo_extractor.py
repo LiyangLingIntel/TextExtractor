@@ -3,9 +3,10 @@ import os
 import json
 import xlwt
 
-from src.py.settings import cove_folder, output_folder, truncated_cove_folder, truncated_dd_folder
-from src.py.utils import roman_num, num_roman, find_txt_files
-from src.py.utils import split_sen, split_para, find_txt_files
+from settings import cove_folder, output_folder, truncated_cove_folder, truncated_dd_folder, text_folder
+from utils import roman_num, num_roman, find_txt_files
+from utils import split_sen, split_para, find_txt_files
+from covenant_extractor import ConvenantTools
 
 
 class InfoTools:
@@ -24,6 +25,7 @@ class InfoTools:
                                    r'balance sheet|cash flow|income,earning|profit|revenue|sale|'
                                    r'audited|unaudited).*?\s', re.IGNORECASE)
         self.fin_pat2 = re.compile(r'EBIT|EBDIT|EPS')
+        self.debt_pat = re.compile(r'bank|debt|loan|credit|borrow', re.IGNORECASE)
 
     def get_duedate_sens(self, para: str) -> dict:
         """
@@ -38,24 +40,6 @@ class InfoTools:
         sens = split_sen(para)
         for sen in sens:
 
-            # # 03-11 version
-            # fin_word = re.search(self.cont_pat, sen)
-            # if fin_word:
-            #     month = re.search(self.month_pat, sen)
-            #     if month:
-            #         due_date_sens['month'].append((sen, month.group(), fin_word.group()))
-            #         continue
-            #     quarter = re.search(self.quarter_pat, sen)
-            #     if quarter:
-            #         due_date_sens['quarter'].append((sen, quarter.group(), fin_word.group()))
-            #         continue
-            #     annual = re.search(self.annual_pat, sen)
-            #     if annual:
-            #         due_date_sens['annual'].append((sen, annual.group(), fin_word.group()))
-            #         continue
-            #     others = re.search(self.time_pat, sen)
-            #     if others:
-            #         due_date_sens['others'].append((sen, others.group(), fin_word.group()))
             fin_keys = []
             fin_keys.extend([fk.strip() for fk in self.fin_pat1.findall(sen)])
             fin_keys.extend([fk.strip() for fk in self.fin_pat2.findall(sen)])
@@ -111,6 +95,7 @@ class InfoTools:
 
         return due_date_sens
 
+
     def get_shorten_sen(self, key_word: str, sentence: str) -> str:
         sen_list = sentence.strip().split()
         key_position = 0
@@ -130,18 +115,9 @@ class InfoTools:
 
     def get_highlight_sen(self, key_words: list, sentence: str) -> str:
 
-        list_sens = sentence.strip().split()
+        # list_sens = sentence.strip().split()
         for w in key_words:
-            # sentence = re.subn(r'w', f'****{w}****', sentence)[0]
             sentence = sentence.replace(w, f'****{w}****', 100)
-            # # 0311 version
-            # key = w
-            # if w not in list_sens:
-            #     for word in list_sens:
-            #         if w in word:
-            #             key = word
-            #             break
-            # sentence = sentence.replace(key, f'****{key}****', 100)
         return sentence
 
     def write_xls_sheet(self, sheet, row, **content: dict):
@@ -159,27 +135,23 @@ class InfoTools:
             first_lines = re.subn(r'[-= ]{5,}', '', content['first_lines'])[0]
             sen = re.subn(r'[-= ]{5,}', '', sen)[0]
 
-            # shorten_sen = self.get_shorten_sen(time, sen)
-            # shorten_sen = self.get_highlight_sen([time], shorten_sen)
             shorten_sen = short_sen
-            # sen = self.get_highlight_sen([time, fin], sen)
             sen = self.get_highlight_sen(fin_keys, sen)
 
             sheet.write(row, 0, content['name'])
             sheet.write(row, 1, content['is_original'])
-            sheet.write(row, 2, first_lines)
-            sheet.write(row, 3, shorten_sen)
-            sheet.write(row, 4, sen)
-
+            sheet.write(row, 2, content['is_debt'])
+            sheet.write(row, 3, first_lines)
+            sheet.write(row, 4, shorten_sen)
+            sheet.write(row, 5, sen)
             row += 1
         return sheet, row
 
 
 if __name__ == '__main__':
 
-    # initial variables
     info_tool = InfoTools()
-    # file_names = find_txt_files(cove_folder)
+    covenant_processor = ConvenantTools()
     fail_list = []
 
     suc_counter = 0
@@ -187,10 +159,11 @@ if __name__ == '__main__':
     date_dict = {}
 
     year_file_dic = {}
-    for year in range(1996, 2007):
+    for year in range(1996, 2018):
 
-        year_folder = os.path.join(truncated_cove_folder, str(year))
-        year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.json')]
+        # year_folder = os.path.join(truncated_cove_folder, str(year))
+        year_folder = os.path.join(text_folder, str(year))
+        year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
     for year, file_names in tuple(year_file_dic.items()):
 
@@ -198,7 +171,7 @@ if __name__ == '__main__':
 
         # 初始化excel workbook，否则信息会累加到后面的文件中
         date_book = xlwt.Workbook()
-        headers = ['name', 'is_original', 'first_lines', 'shorten_sen', 'due_date_sen']
+        headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
         # sheet_names = ['month', 'quarter', 'annual', 'others']
         sheet_names = ['month']
 
@@ -212,13 +185,22 @@ if __name__ == '__main__':
 
         date_dict[year] = {'month': 0, 'quarter': 0, 'annual': 0, 'others': 0}
 
-        year_folder = os.path.join(truncated_cove_folder, str(year))
+        year_folder = os.path.join(text_folder, str(year))
 
         for name in file_names:
 
-            with open(os.path.join(year_folder, name), 'r') as f:
-                src_dic = json.load(f)      # keys: name, first_lines, is_original, covenant
-            paras = split_para(src_dic['covenant'])
+            is_debt = False
+
+            with open(os.path.join(year_folder, name), 'r', encoding='utf-8') as f:
+                lines = [line for line in f.readlines() if not line.strip()]
+                first_lines = covenant_processor.get_n_lines(5, lines)
+                is_origin = True if covenant_processor.is_original(first_lines) else False
+                is_debt = True if re.search(info_tool.debt_pat, covenant_processor.get_n_lines(10, lines)) else False
+                content = ''.join(lines)
+                # src_dic = json.load(f)      # keys: name, first_lines, is_original, covenant
+            del lines
+            # paras = split_para(src_dic['covenant'])
+            paras = split_para(content)
 
             # info_sens = []
             date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
@@ -242,11 +224,12 @@ if __name__ == '__main__':
                     continue
                 date_dict[year][date_type] += 1
                 _, row_iter[date_type] = info_tool.write_xls_sheet(sheet=xls_sheets[date_type], row=row_iter[date_type],
-                                                                   name=src_dic['name'], is_original=src_dic['is_original'],
-                                                                   first_lines=src_dic['first_lines'],
+                                                                   name=name, is_original=is_origin, is_debt=is_debt,
+                                                                   first_lines=first_lines,
                                                                    due_date_sen=date_sens.get(date_type))
                 break
-
+            break
+        break
         date_book.save(os.path.join(truncated_dd_folder, f'due_date_{year}.xls'))
         del date_book
 
