@@ -3,9 +3,9 @@ import os
 import nltk
 
 
-def find_txt_files(root: str) -> list:
+def find_files_with_postfix(root: str, postfox: str = 'txt') -> list:
 
-    file_list = [file for file in os.listdir(root) if file.endswith('.txt')]
+    file_list = [file for file in os.listdir(root) if file.endswith(f'.{postfox}')]
     return file_list
 
 

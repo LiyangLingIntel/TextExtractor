@@ -1,4 +1,5 @@
-from utils.utils import find_txt_files, roman_num, num_roman
+from py.utils.utils import find_files_with_postfix, roman_num, num_roman
+import re, nltk
 
 def split_para(text: str) -> str:
     """
@@ -6,9 +7,9 @@ def split_para(text: str) -> str:
     :param text:
     :return:
     """
-    paras = re.subn(r'([^;:.?!])\n', ' ', text)[0]
+    paras = re.subn(r'(?<=[^:.?!])\n', ' ', text)[0]
     paras = re.subn(r' +', ' ', paras)[0]
-    return paras
+    return paras.split('\n')
 
 
 def indent_para(text: str) -> str:

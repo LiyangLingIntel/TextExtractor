@@ -3,7 +3,7 @@
 import os
 import re
 import nltk
-from settings import resource_folder, cove_folder, output_folder
+from py.settings import resource_folder, cove_folder, output_folder
 
 
 class ReportTools:
