@@ -15,7 +15,8 @@ class InfoTools:
     def __init__(self):
 
         # self.time_pat = r'\s(?:month|quarter|annual|end|day)\s'
-        self.month_pat = re.compile(r'(?<=\s)(?:month|months|monthly)(?=\s)', re.IGNORECASE)     # 需要做等值比较的，不能有空格
+        self.month_pat = re.compile(r'(?<=\s)(?:months|monthly|month)(?=\s)', re.IGNORECASE)     # 需要做等值比较的，不能有空格
+        self.date_pat = re.compile(r'(?<=\s)(?:days|year|annual|quarterly|quarter|monthly|month)(?=\s)', re.IGNORECASE)
         self.quarter_pat = r'quarter'
         self.annual_pat = r'annual'
         self.time_pat = r'(?:end|day)'
@@ -24,9 +25,13 @@ class InfoTools:
         self.routine_pat = re.compile(r'\s(?:each|every)\s', re.IGNORECASE)
         self.fin_pat1 = re.compile(r'\s(?:financial_statement|financial_report|consolidated|consolidating|'
                                    r'balance_sheet|cash_flow|income|earning|profit|revenue|sale|'
-                                   r'audited|unaudited)\s', re.IGNORECASE)
+                                   r'unaudited|audited)\s', re.IGNORECASE)
         self.fin_pat2 = re.compile(r'EBIT|EBDIT|EPS')
         self.debt_pat = re.compile(r'bank|debt|loan|credit|borrow', re.IGNORECASE)
+
+        # projection info
+        self.proj_pat = re.compile(r'budgeted|budgets|budget|projections|projected|projection|forecasted|'
+                                   r'forecast|anticipated|anticipations|anticipation|plans|plan', re.IGNORECASE)
 
     def get_duedate_sens(self, para: str) -> dict:
         """
@@ -200,6 +205,52 @@ class InfoTools:
 
         return sens_res
 
+    def global_search_by_proj_key(self, content, interval) -> list:
+
+        # preprocessing
+        content = re.subn(r'balance sheet', 'balance_sheet', content)[0]
+        content = re.subn(r'financial statement', 'financial_statement', content)[0]
+        content = re.subn(r'financial report', 'financial_report', content)[0]
+        content = re.subn(r'cash flow', 'cash_flow', content)[0]
+
+        def search_fin_keys(txt):
+            proj_keys = [pk.strip() for pk in self.proj_pat.findall(txt)]
+            return proj_keys
+
+        sens_res = []
+
+        proj_keys = search_fin_keys(content)
+
+        pter_content = 0
+        pter_pk = 0
+
+        content_words = [wd.strip() for wd in content.split()]
+        total_length = len(content_words)
+        while pter_pk < len(proj_keys) and pter_content < total_length:
+
+            pk = proj_keys[pter_pk] if pter_pk < len(proj_keys) else ''
+
+            if content_words[pter_content] == pk:
+                start = max(0, pter_content-interval)
+                end = min(total_length, pter_content+interval)
+                sentence = ' '.join(content_words[start: end])
+                tmp_pk = search_fin_keys((sentence))
+
+                # highlight key words
+                sentence = self.get_highlight_sen(tmp_pk, sentence)
+                sens_res.append(sentence)
+
+                # incease pointer index
+                # pter_content += end
+                # pter_fk_1 += len(tmp_fk_1)
+                # pter_fk_2 += len(tmp_fk_2)
+                pter_content += 1
+                pter_pk += 1
+            else:
+                pter_content += 1
+
+        return sens_res
+
     def global_filter_by_mounthly_key(self, content_list) -> list:
 
         full_shorten_res = []
@@ -208,7 +259,8 @@ class InfoTools:
 
         for content in content_list:
 
-            tmp_months = self.month_pat.findall(content)
+            # tmp_months = self.month_pat.findall(content)
+            tmp_months = self.date_pat.findall(content)
             if not tmp_months:
                 continue
 
@@ -231,7 +283,7 @@ class InfoTools:
                         rk_index = shorten_month_sen.index(routine_key)
 
                         content_words[start + rk_index] = f'****{routine_key}****'
-                        content_words[s_pointer] = f'****{content_words[m_pointer]}****'
+                        content_words[s_pointer] = f'****{content_words[s_pointer]}****'
                         shorten_month_sen[rk_index] = f'****{routine_key}****'
                         shorten_month_sen[s_pointer - start] = f'****{tmp_months[m_pointer]}****'
 
@@ -244,169 +296,169 @@ class InfoTools:
 
 
 
-if __name__ == '__main__':
-
-    info_tool = InfoTools()
-    covenant_processor = ConvenantTools()
-    fail_list = []
-
-    text_folder = './text/txt_result/'
-
-    suc_counter = 0
-    err_counter = 0
-    date_dict = {}
-
-    year_file_dic = {}
-    year = 2007
-    year_folder = os.path.join(text_folder, str(year))
-    year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
-
-    for year, file_names in tuple(year_file_dic.items()):
-
-        # 初始化excel workbook，否则信息会累加到后面的文件中
-        date_book = xlwt.Workbook()
-        headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
-        # sheet_names = ['month', 'quarter', 'annual', 'others']
-        sheet_names = ['month']
-
-        # init headers for each type of sheets
-        xls_sheets = {}
-        for type in sheet_names:
-            xls_sheets[type] = date_book.add_sheet(type)
-            for col, head in enumerate(headers):
-                xls_sheets[type].write(0, col, head)
-        row_iter = dict.fromkeys(sheet_names, 1)
-
-        date_dict[year] = {'month': 0, 'quarter': 0, 'annual': 0, 'others': 0}
-
-        year_folder = os.path.join(text_folder, str(year))
-
-        for name in file_names:
-
-            is_debt = False
-
-            with open(os.path.join(year_folder, name), 'r', encoding='utf-8') as f:
-                lines = [line for line in f.readlines() if line.strip()]
-                first_lines = covenant_processor.get_n_lines(5, lines)
-                is_origin = True if covenant_processor.is_original(first_lines) else False
-                is_debt = True if re.search(info_tool.debt_pat, covenant_processor.get_n_lines(10, lines)) else False
-                content = '\n'.join(lines)
-            del lines
-            # paras = split_para(src_dic['covenant'])
-            paras = split_para(content)
-
-            # info_sens = []
-            date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
-            for para in paras:
-                sens = info_tool.get_duedate_sens(para)  # get a list
-
-                if sens:
-                    if sens['month']:
-                        date_sens['month'].extend(sens['month'])
-                    elif sens['quarter']:
-                        date_sens['quarter'].extend(sens['quarter'])
-                    elif sens['annual']:
-                        date_sens['annual'].extend(sens['annual'])
-                    elif sens['others']:
-                        date_sens['others'].extend(sens['others'])
-
-            # write info into xls by each file iteration
-            for date_type in sheet_names:
-                if not date_sens[date_type]:
-                    continue
-                date_dict[year][date_type] += 1
-                _, row_iter[date_type] = info_tool.write_xls_sheet(sheet=xls_sheets[date_type], row=row_iter[date_type],
-                                                                   name=name, is_original=is_origin, is_debt=is_debt,
-                                                                   first_lines=first_lines,
-                                                                   due_date_sen=date_sens.get(date_type))
-                break
-            break
-        break
-        date_book.save(os.path.join('./output/fulltext', f'due_date_{year}.xls'))
-        del date_book
-
-    print('due date finished!')
-    print(date_dict)
-
-
-
-
-    #
-    # year_file_dic = {}
-    # year = 2007
-    # # year_folder = os.path.join(truncated_cove_folder, str(year))
-    # year_folder = os.path.join(text_folder, str(year))
-    # year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
-    #
-    # for year, file_names in tuple(year_file_dic.items()):
-    #
-    #     print(year)
-    #
-    #     # 初始化excel workbook，否则信息会累加到后面的文件中
-    #     date_book = xlwt.Workbook()
-    #     headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
-    #     # sheet_names = ['month', 'quarter', 'annual', 'others']
-    #     sheet_names = ['month']
-    #
-    #     # init headers for each type of sheets
-    #     xls_sheets = {}
-    #     for type in sheet_names:
-    #         xls_sheets[type] = date_book.add_sheet(type)
-    #         for col, head in enumerate(headers):
-    #             xls_sheets[type].write(0, col, head)
-    #     row_iter = dict.fromkeys(sheet_names, 1)
-    #
-    #     date_dict[year] = {'month': 0, 'quarter': 0, 'annual': 0, 'others': 0}
-    #
-    #     year_folder = os.path.join(text_folder, str(year))
-    #
-    #     for name in file_names:
-    #
-    #         is_debt = False
-    #
-    #         with open(os.path.join(year_folder, name), 'r', encoding='utf-8') as f:
-    #             lines = [line for line in f.readlines() if not line.strip()]
-    #             first_lines = covenant_processor.get_n_lines(5, lines)
-    #             is_origin = True if covenant_processor.is_original(first_lines) else False
-    #             is_debt = True if re.search(info_tool.debt_pat, covenant_processor.get_n_lines(10, lines)) else False
-    #             content = ''.join(lines)
-    #             # src_dic = json.load(f)      # keys: name, first_lines, is_original, covenant
-    #         del lines
-    #         # paras = split_para(src_dic['covenant'])
-    #         paras = split_para(content)
-    #
-    #         # info_sens = []
-    #         date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
-    #         for para in paras.split('\n'):
-    #             sens = info_tool.get_duedate_sens(para)  # get a list
-    #
-    #             if sens:
-    #                 if sens['month']:
-    #                     date_sens['month'].extend(sens['month'])
-    #                 elif sens['quarter']:
-    #                     date_sens['quarter'].extend(sens['quarter'])
-    #                 elif sens['annual']:
-    #                     date_sens['annual'].extend(sens['annual'])
-    #                 elif sens['others']:
-    #                     date_sens['others'].extend(sens['others'])
-    #
-    #
-    #         # write info into xls by each file iteration
-    #         for date_type in sheet_names:
-    #             if not date_sens[date_type]:
-    #                 continue
-    #             date_dict[year][date_type] += 1
-    #             _, row_iter[date_type] = info_tool.write_xls_sheet(sheet=xls_sheets[date_type], row=row_iter[date_type],
-    #                                                                name=name, is_original=is_origin, is_debt=is_debt,
-    #                                                                first_lines=first_lines,
-    #                                                                due_date_sen=date_sens.get(date_type))
-    #             break
-    #         break
-    #     break
-    #     date_book.save(os.path.join('./output/duedate/2007', f'due_date_{year}.xls'))
-    #     del date_book
-    #
-    # print('due date finished!')
-    # print(date_dict)
+# if __name__ == '__main__':
+#
+#     info_tool = InfoTools()
+#     covenant_processor = ConvenantTools()
+#     fail_list = []
+#
+#     text_folder = './text/txt_result/'
+#
+#     suc_counter = 0
+#     err_counter = 0
+#     date_dict = {}
+#
+#     year_file_dic = {}
+#     year = 2007
+#     year_folder = os.path.join(text_folder, str(year))
+#     year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
+#
+#     for year, file_names in tuple(year_file_dic.items()):
+#
+#         # 初始化excel workbook，否则信息会累加到后面的文件中
+#         date_book = xlwt.Workbook()
+#         headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
+#         # sheet_names = ['month', 'quarter', 'annual', 'others']
+#         sheet_names = ['month']
+#
+#         # init headers for each type of sheets
+#         xls_sheets = {}
+#         for type in sheet_names:
+#             xls_sheets[type] = date_book.add_sheet(type)
+#             for col, head in enumerate(headers):
+#                 xls_sheets[type].write(0, col, head)
+#         row_iter = dict.fromkeys(sheet_names, 1)
+#
+#         date_dict[year] = {'month': 0, 'quarter': 0, 'annual': 0, 'others': 0}
+#
+#         year_folder = os.path.join(text_folder, str(year))
+#
+#         for name in file_names:
+#
+#             is_debt = False
+#
+#             with open(os.path.join(year_folder, name), 'r', encoding='utf-8') as f:
+#                 lines = [line for line in f.readlines() if line.strip()]
+#                 first_lines = covenant_processor.get_n_lines(5, lines)
+#                 is_origin = True if covenant_processor.is_original(first_lines) else False
+#                 is_debt = True if re.search(info_tool.debt_pat, covenant_processor.get_n_lines(10, lines)) else False
+#                 content = '\n'.join(lines)
+#             del lines
+#             # paras = split_para(src_dic['covenant'])
+#             paras = split_para(content)
+#
+#             # info_sens = []
+#             date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
+#             for para in paras:
+#                 sens = info_tool.get_duedate_sens(para)  # get a list
+#
+#                 if sens:
+#                     if sens['month']:
+#                         date_sens['month'].extend(sens['month'])
+#                     elif sens['quarter']:
+#                         date_sens['quarter'].extend(sens['quarter'])
+#                     elif sens['annual']:
+#                         date_sens['annual'].extend(sens['annual'])
+#                     elif sens['others']:
+#                         date_sens['others'].extend(sens['others'])
+#
+#             # write info into xls by each file iteration
+#             for date_type in sheet_names:
+#                 if not date_sens[date_type]:
+#                     continue
+#                 date_dict[year][date_type] += 1
+#                 _, row_iter[date_type] = info_tool.write_xls_sheet(sheet=xls_sheets[date_type], row=row_iter[date_type],
+#                                                                    name=name, is_original=is_origin, is_debt=is_debt,
+#                                                                    first_lines=first_lines,
+#                                                                    due_date_sen=date_sens.get(date_type))
+#                 break
+#             break
+#         break
+#         date_book.save(os.path.join('./output/fulltext', f'due_date_{year}.xls'))
+#         del date_book
+#
+#     print('due date finished!')
+#     print(date_dict)
+#
+#
+#
+#
+#     #
+#     # year_file_dic = {}
+#     # year = 2007
+#     # # year_folder = os.path.join(truncated_cove_folder, str(year))
+#     # year_folder = os.path.join(text_folder, str(year))
+#     # year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
+#     #
+#     # for year, file_names in tuple(year_file_dic.items()):
+#     #
+#     #     print(year)
+#     #
+#     #     # 初始化excel workbook，否则信息会累加到后面的文件中
+#     #     date_book = xlwt.Workbook()
+#     #     headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
+#     #     # sheet_names = ['month', 'quarter', 'annual', 'others']
+#     #     sheet_names = ['month']
+#     #
+#     #     # init headers for each type of sheets
+#     #     xls_sheets = {}
+#     #     for type in sheet_names:
+#     #         xls_sheets[type] = date_book.add_sheet(type)
+#     #         for col, head in enumerate(headers):
+#     #             xls_sheets[type].write(0, col, head)
+#     #     row_iter = dict.fromkeys(sheet_names, 1)
+#     #
+#     #     date_dict[year] = {'month': 0, 'quarter': 0, 'annual': 0, 'others': 0}
+#     #
+#     #     year_folder = os.path.join(text_folder, str(year))
+#     #
+#     #     for name in file_names:
+#     #
+#     #         is_debt = False
+#     #
+#     #         with open(os.path.join(year_folder, name), 'r', encoding='utf-8') as f:
+#     #             lines = [line for line in f.readlines() if not line.strip()]
+#     #             first_lines = covenant_processor.get_n_lines(5, lines)
+#     #             is_origin = True if covenant_processor.is_original(first_lines) else False
+#     #             is_debt = True if re.search(info_tool.debt_pat, covenant_processor.get_n_lines(10, lines)) else False
+#     #             content = ''.join(lines)
+#     #             # src_dic = json.load(f)      # keys: name, first_lines, is_original, covenant
+#     #         del lines
+#     #         # paras = split_para(src_dic['covenant'])
+#     #         paras = split_para(content)
+#     #
+#     #         # info_sens = []
+#     #         date_sens = {'month': [], 'quarter': [], 'annual': [], 'others': []}
+#     #         for para in paras.split('\n'):
+#     #             sens = info_tool.get_duedate_sens(para)  # get a list
+#     #
+#     #             if sens:
+#     #                 if sens['month']:
+#     #                     date_sens['month'].extend(sens['month'])
+#     #                 elif sens['quarter']:
+#     #                     date_sens['quarter'].extend(sens['quarter'])
+#     #                 elif sens['annual']:
+#     #                     date_sens['annual'].extend(sens['annual'])
+#     #                 elif sens['others']:
+#     #                     date_sens['others'].extend(sens['others'])
+#     #
+#     #
+#     #         # write info into xls by each file iteration
+#     #         for date_type in sheet_names:
+#     #             if not date_sens[date_type]:
+#     #                 continue
+#     #             date_dict[year][date_type] += 1
+#     #             _, row_iter[date_type] = info_tool.write_xls_sheet(sheet=xls_sheets[date_type], row=row_iter[date_type],
+#     #                                                                name=name, is_original=is_origin, is_debt=is_debt,
+#     #                                                                first_lines=first_lines,
+#     #                                                                due_date_sen=date_sens.get(date_type))
+#     #             break
+#     #         break
+#     #     break
+#     #     date_book.save(os.path.join('./output/duedate/2007', f'due_date_{year}.xls'))
+#     #     del date_book
+#     #
+#     # print('due date finished!')
+#     # print(date_dict)
 
 

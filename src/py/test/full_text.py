@@ -28,7 +28,8 @@ if __name__ == '__main__':
 
         # 初始化excel workbook，否则信息会累加到后面的文件中
         date_book = xlwt.Workbook()
-        headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
+        # headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
+        headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'projection_sen']
         sheet_name = 'month'
 
         # init headers for sheet
@@ -74,7 +75,8 @@ if __name__ == '__main__':
                                                        name=name, is_original=is_origin, is_debt=is_debt,
                                                        first_lines=first_lines,
                                                        due_date_sen=full_shorten_sens)
-        date_book.save(os.path.join('./output/fulltext', f'due_date_{year}.xls'))
+        # date_book.save(os.path.join('./output/fulltext', f'due_date_{year}.xls'))
+        date_book.save(os.path.join('./output/projection', f'projection_{year}.xls'))
         del date_book
 
         print(f'{year}: ', date_dict[year]['month'], ' / ', len(year_file_dic[year]))
