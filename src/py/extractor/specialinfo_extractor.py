@@ -33,6 +33,8 @@ class InfoTools:
         self.proj_pat = re.compile(r'budgeted|budgets|budget|projections|projected|projection|forecasted|'
                                    r'forecast|anticipated|anticipations|anticipation|plans|plan', re.IGNORECASE)
 
+        # self.date_pat = re.compile(r'(?<=\s)(?:days|year|annual|quarterly|quarter|monthly|month)(?=\s)', re.IGNORECASE)
+
     def get_duedate_sens(self, para: str) -> dict:
         """
         return the sentence that contains the due date in this paragraph
@@ -126,7 +128,21 @@ class InfoTools:
             sentence = sentence.replace(w, f'****{w}****', 100)
         return sentence
 
-    def write_xls_sheet(self, sheet, row, **content: dict):
+    def write_xls_header(self, headers, xls_book, sheet_name='sheet1'):
+        """
+        :param xls_book:
+        :param headers:
+        :return: xls_sheet, row_iter
+        """
+        # init headers for sheet
+        xls_sheet = xls_book.add_sheet(sheet_name)
+        for col, head in enumerate(headers):
+            xls_sheet.write(0, col, head)
+        row_iter = 1
+
+        return xls_sheet, row_iter
+
+    def write_xls_sheet(self, sheet, row, headers, **content: dict):
         """
         :param sheet: target sheet
         :param row: new row to be wrote
@@ -134,24 +150,24 @@ class InfoTools:
                         name, is_original, first_lines, shorten_sen, due_date_sen
         :return: sheet object, next row number
         """
-        due_date_sens = content.pop('due_date_sen')
-        for sen, short_sen in set(due_date_sens):
 
-            # reclean first lines
-            first_lines = re.subn(r'[-= ]{5,}', '', content['first_lines'])[0]
-            # first_lines = content['first_lines']
-            sen = re.subn(r'[-= ]{5,}', '', sen)[0]
+        matched_sens = content.pop('matched_sens', None)
+        if matched_sens:
+            for sen, short_sen in set(matched_sens):
+                # re-clean
+                sen = re.subn(r'[-= ]{5,}', '', sen)[0]
 
-            shorten_sen = short_sen
-            # sen = self.get_highlight_sen(fin_keys, sen)
-
-            sheet.write(row, 0, content['name'])
-            sheet.write(row, 1, content['is_original'])
-            sheet.write(row, 2, content['is_debt'])
-            sheet.write(row, 3, first_lines)
-            sheet.write(row, 4, shorten_sen)
-            sheet.write(row, 5, sen)
+                sheet.write(row, 0, content['name'])
+                sheet.write(row, 1, short_sen)
+                sheet.write(row, 2, sen)
+                row += 1
+        else:
+            # re-clean first lines
+            content['first_lines'] = re.subn(r'[-= ]{5,}', '', content.get('first_lines', ''))[0]
+            for i in range(len(headers)):
+                sheet.write(row, i, content.get(headers[i], None))
             row += 1
+
         return sheet, row
 
     def global_search_by_fin_key(self, content, interval) -> list:
@@ -213,13 +229,13 @@ class InfoTools:
         content = re.subn(r'financial report', 'financial_report', content)[0]
         content = re.subn(r'cash flow', 'cash_flow', content)[0]
 
-        def search_fin_keys(txt):
+        def search_proj_keys(txt):
             proj_keys = [pk.strip() for pk in self.proj_pat.findall(txt)]
             return proj_keys
 
         sens_res = []
 
-        proj_keys = search_fin_keys(content)
+        proj_keys = search_proj_keys(content)
 
         pter_content = 0
         pter_pk = 0
@@ -234,7 +250,7 @@ class InfoTools:
                 start = max(0, pter_content-interval)
                 end = min(total_length, pter_content+interval)
                 sentence = ' '.join(content_words[start: end])
-                tmp_pk = search_fin_keys((sentence))
+                tmp_pk = search_proj_keys(sentence)
 
                 # highlight key words
                 sentence = self.get_highlight_sen(tmp_pk, sentence)
@@ -251,17 +267,15 @@ class InfoTools:
 
         return sens_res
 
-    def global_filter_by_mounthly_key(self, content_list) -> list:
+    def global_filter_by_key(self, content_list, pattern) -> list:
+
 
         full_shorten_res = []
-        is_true = False
-        shorten_month_sen = []
 
         for content in content_list:
 
-            # tmp_months = self.month_pat.findall(content)
-            tmp_months = self.date_pat.findall(content)
-            if not tmp_months:
+            matched_keys = getattr(self, pattern).findall(content)
+            if not matched_keys:
                 continue
 
             content_words = content.split()
@@ -269,9 +283,9 @@ class InfoTools:
             s_pointer = 0
             m_pointer = 0
 
-            while m_pointer < len(tmp_months) and s_pointer < total_length:
+            while m_pointer < len(matched_keys) and s_pointer < total_length:
 
-                if content_words[s_pointer] == tmp_months[m_pointer]:
+                if content_words[s_pointer] == matched_keys[m_pointer]:
                     start = max(0, s_pointer - 10)
                     end = min(s_pointer + 10, total_length)
                     short_sen = ' '.join(content_words[start: end])
@@ -285,7 +299,7 @@ class InfoTools:
                         content_words[start + rk_index] = f'****{routine_key}****'
                         content_words[s_pointer] = f'****{content_words[s_pointer]}****'
                         shorten_month_sen[rk_index] = f'****{routine_key}****'
-                        shorten_month_sen[s_pointer - start] = f'****{tmp_months[m_pointer]}****'
+                        shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
 
                         full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
 
@@ -293,6 +307,49 @@ class InfoTools:
                 s_pointer += 1
 
         return full_shorten_res
+
+    # def global_filter_by_mounthly_key(self, content_list) -> list:
+    #
+    #     full_shorten_res = []
+    #     is_true = False
+    #     # shorten_month_sen = []
+    #
+    #     for content in content_list:
+    #
+    #         # tmp_months = self.month_pat.findall(content)
+    #         tmp_months = self.date_pat.findall(content)
+    #         if not tmp_months:
+    #             continue
+    #
+    #         content_words = content.split()
+    #         total_length = len(content_words)
+    #         s_pointer = 0
+    #         m_pointer = 0
+    #
+    #         while m_pointer < len(tmp_months) and s_pointer < total_length:
+    #
+    #             if content_words[s_pointer] == tmp_months[m_pointer]:
+    #                 start = max(0, s_pointer - 10)
+    #                 end = min(s_pointer + 10, total_length)
+    #                 short_sen = ' '.join(content_words[start: end])
+    #                 routine_key = self.routine_pat.search(short_sen)
+    #                 if routine_key:
+    #                     routine_key = routine_key.group().strip()
+    #                     shorten_month_sen = content_words[start: end]
+    #
+    #                     rk_index = shorten_month_sen.index(routine_key)
+    #
+    #                     content_words[start + rk_index] = f'****{routine_key}****'
+    #                     content_words[s_pointer] = f'****{content_words[s_pointer]}****'
+    #                     shorten_month_sen[rk_index] = f'****{routine_key}****'
+    #                     shorten_month_sen[s_pointer - start] = f'****{tmp_months[m_pointer]}****'
+    #
+    #                     full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+    #
+    #                 m_pointer += 1
+    #             s_pointer += 1
+    #
+    #     return full_shorten_res
 
 
 

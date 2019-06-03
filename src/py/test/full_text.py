@@ -24,21 +24,23 @@ if __name__ == '__main__':
         year_folder = os.path.join(text_folder, str(year))
         year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
+    types = ['basic', 'duedate', 'proj']
+    headers = {}
+    headers['basic'] = ['name', 'is_original', 'is_debt', 'first_lines']
+    headers['duedate'] = ['name', 'shorten_sen', 'due_date_sen']
+    headers['proj'] = ['name', 'shorten_sen', 'projection_sen']
+    books = {}
+    sheets = {}
+    row_counter = {}
+
     for year, file_names in tuple(year_file_dic.items()):
 
         # 初始化excel workbook，否则信息会累加到后面的文件中
-        date_book = xlwt.Workbook()
-        # headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'due_date_sen']
-        headers = ['name', 'is_original', 'is_debt', 'first_lines', 'shorten_sen', 'projection_sen']
-        sheet_name = 'month'
+        for t in types:
+            books[t] = xlwt.Workbook()
+            sheets[t], row_counter[t] = info_tool.write_xls_header(headers[t], books[t])
 
-        # init headers for sheet
-        xls_sheet = date_book.add_sheet(sheet_name)
-        for col, head in enumerate(headers):
-            xls_sheet.write(0, col, head)
-        row_iter = 1
-
-        date_dict[year] = {'month': 0}
+        date_dict[year] = {'duedate': 0, 'proj': 0}
 
         year_folder = os.path.join(text_folder, str(year))
 
@@ -54,32 +56,47 @@ if __name__ == '__main__':
                 content = '\n'.join(lines)
             del lines
 
-            # cleaning
-            content = re.subn(r'\-[0-9]{1,2}\-', '', content)[0]
-            content = re.subn(r'[-=_ ]{5,}', '', content)[0]
-
-            # date_sens = []
-            # for para in paras:
-            #     sens = info_tool.get_duedate_sens(para)  # get a list
+            # # cleaning
+            # content = re.subn(r'\-[0-9]{1,2}\-', '', content)[0]
+            # content = re.subn(r'[-=_ ]{5,}', '', content)[0]
             #
-            #     if sens:
-            #         date_sens.extend(sens['month'])
-            sens = info_tool.global_search_by_fin_key(content, 150)
-            full_shorten_sens = [('', '')]
-            full_shorten_sens.extend(info_tool.global_filter_by_mounthly_key(sens))
+            # fin_sens = info_tool.global_search_by_fin_key(content, 150)
+            # proj_sens = info_tool.global_search_by_proj_key(content, 150)
+            #
+            # fin_full_shorten_sens = info_tool.global_filter_by_key(fin_sens, pattern='month_pat')
+            # proj_full_shorten_sens = info_tool.global_filter_by_key(proj_sens, pattern='date_pat')
 
             # write info into xls by each file iteration
-            if len(full_shorten_sens) > 1:
-                date_dict[year]['month'] += 1
-            xls_sheet, row_iter = info_tool.write_xls_sheet(sheet=xls_sheet, row=row_iter,
-                                                       name=name, is_original=is_origin, is_debt=is_debt,
-                                                       first_lines=first_lines,
-                                                       due_date_sen=full_shorten_sens)
-        # date_book.save(os.path.join('./output/fulltext', f'due_date_{year}.xls'))
-        date_book.save(os.path.join('./output/projection', f'projection_{year}.xls'))
-        del date_book
 
-        print(f'{year}: ', date_dict[year]['month'], ' / ', len(year_file_dic[year]))
+            sheets['basic'], row_counter['basic'] = info_tool.write_xls_sheet(sheet=sheets['basic'],
+                                                                              row=row_counter['basic'],
+                                                                              headers=headers['basic'],
+                                                                              name=name,
+                                                                              is_original=is_origin,
+                                                                              is_debt=is_debt,
+                                                                              first_lines=first_lines)
+            # if fin_full_shorten_sens:
+            #     date_dict[year]['duedate'] += 1
+            #     sheets['duedate'], row_counter['duedate'] = info_tool.write_xls_sheet(sheet=sheets['duedate'],
+            #                                                                           row=row_counter['duedate'],
+            #                                                                           headers=headers['duedate'],
+            #                                                                           name=name,
+            #                                                                           matched_sens=fin_full_shorten_sens)
+            # if proj_full_shorten_sens:
+            #     date_dict[year]['proj'] += 1
+            #     sheets['proj'], row_counter['proj'] = info_tool.write_xls_sheet(sheet=sheets['proj'],
+            #                                                                     row=row_counter['proj'],
+            #                                                                     headers=headers['proj'],
+            #                                                                     name=name,
+            #                                                                     matched_sens=proj_full_shorten_sens)
 
-    print('due date finished!')
-    # print(date_dict[year]['month'], ' / ', len(year_file_dic[year]))
+        types = ['basic']
+        for t in types:
+            books[t].save(os.path.join('./output/fulltext', f'{t}_{year}.xls'))
+            del books[t]
+
+        print(f'{year}: ')
+        # print('\t', date_dict[year]['duedate'], ' / ', len(year_file_dic[year]))
+        # print('\t', date_dict[year]['proj'], ' / ', len(year_file_dic[year]))
+
+    print('finished!')
