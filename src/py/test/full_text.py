@@ -18,7 +18,7 @@ if __name__ == '__main__':
     date_dict = {}
 
     year_file_dic = {}
-    years = [1996, 2017]
+    years = [2011, 2017]
     # years = [2007, 2010]
     for year in range(*years):
         year_folder = os.path.join(text_folder, str(year))
@@ -56,15 +56,15 @@ if __name__ == '__main__':
                 content = '\n'.join(lines)
             del lines
 
-            # # cleaning
-            # content = re.subn(r'\-[0-9]{1,2}\-', '', content)[0]
-            # content = re.subn(r'[-=_ ]{5,}', '', content)[0]
-            #
-            # fin_sens = info_tool.global_search_by_fin_key(content, 150)
-            # proj_sens = info_tool.global_search_by_proj_key(content, 150)
-            #
-            # fin_full_shorten_sens = info_tool.global_filter_by_key(fin_sens, pattern='month_pat')
-            # proj_full_shorten_sens = info_tool.global_filter_by_key(proj_sens, pattern='date_pat')
+            # cleaning
+            content = re.subn(r'\-[0-9]{1,2}\-', '', content)[0]
+            content = re.subn(r'[-=_ ]{5,}', '', content)[0]
+
+            fin_sens = info_tool.global_search_by_fin_key(content, 150)
+            proj_sens = info_tool.global_search_by_proj_key(content, 150)
+
+            fin_full_shorten_sens = info_tool.global_filter_by_key(fin_sens, pattern='month_pat')
+            proj_full_shorten_sens = info_tool.global_filter_by_key(proj_sens, pattern='date_pat')
 
             # write info into xls by each file iteration
 
@@ -75,28 +75,27 @@ if __name__ == '__main__':
                                                                               is_original=is_origin,
                                                                               is_debt=is_debt,
                                                                               first_lines=first_lines)
-            # if fin_full_shorten_sens:
-            #     date_dict[year]['duedate'] += 1
-            #     sheets['duedate'], row_counter['duedate'] = info_tool.write_xls_sheet(sheet=sheets['duedate'],
-            #                                                                           row=row_counter['duedate'],
-            #                                                                           headers=headers['duedate'],
-            #                                                                           name=name,
-            #                                                                           matched_sens=fin_full_shorten_sens)
-            # if proj_full_shorten_sens:
-            #     date_dict[year]['proj'] += 1
-            #     sheets['proj'], row_counter['proj'] = info_tool.write_xls_sheet(sheet=sheets['proj'],
-            #                                                                     row=row_counter['proj'],
-            #                                                                     headers=headers['proj'],
-            #                                                                     name=name,
-            #                                                                     matched_sens=proj_full_shorten_sens)
+            if fin_full_shorten_sens:
+                date_dict[year]['duedate'] += 1
+                sheets['duedate'], row_counter['duedate'] = info_tool.write_xls_sheet(sheet=sheets['duedate'],
+                                                                                      row=row_counter['duedate'],
+                                                                                      headers=headers['duedate'],
+                                                                                      name=name,
+                                                                                      matched_sens=fin_full_shorten_sens)
+            if proj_full_shorten_sens:
+                date_dict[year]['proj'] += 1
+                sheets['proj'], row_counter['proj'] = info_tool.write_xls_sheet(sheet=sheets['proj'],
+                                                                                row=row_counter['proj'],
+                                                                                headers=headers['proj'],
+                                                                                name=name,
+                                                                                matched_sens=proj_full_shorten_sens)
 
-        types = ['basic']
         for t in types:
             books[t].save(os.path.join('./output/fulltext', f'{t}_{year}.xls'))
             del books[t]
 
         print(f'{year}: ')
-        # print('\t', date_dict[year]['duedate'], ' / ', len(year_file_dic[year]))
-        # print('\t', date_dict[year]['proj'], ' / ', len(year_file_dic[year]))
+        print('\t', date_dict[year]['duedate'], ' / ', len(year_file_dic[year]))
+        print('\t', date_dict[year]['proj'], ' / ', len(year_file_dic[year]))
 
     print('finished!')
