@@ -18,9 +18,8 @@ if __name__ == '__main__':
     date_dict = {}
 
     year_file_dic = {}
-    years = [2011, 2017]
-    # years = [2007, 2010]
-    for year in range(*years):
+    years = [1996, 2017]
+    for year in range(*years)[2:]:
         year_folder = os.path.join(text_folder, str(year))
         year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
@@ -95,7 +94,7 @@ if __name__ == '__main__':
             del books[t]
 
         print(f'{year}: ')
-        print('\t', date_dict[year]['duedate'], ' / ', len(year_file_dic[year]))
-        print('\t', date_dict[year]['proj'], ' / ', len(year_file_dic[year]))
+        print('monthly\t', date_dict[year]['duedate'], ' / ', len(year_file_dic[year]))
+        print('projection\t', date_dict[year]['proj'], ' / ', len(year_file_dic[year]))
 
     print('finished!')

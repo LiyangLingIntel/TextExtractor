@@ -15,8 +15,14 @@ class InfoTools:
     def __init__(self):
 
         # self.time_pat = r'\s(?:month|quarter|annual|end|day)\s'
-        self.month_pat = re.compile(r'(?<=\s)(?:months|monthly|month)(?=\s)', re.IGNORECASE)     # 需要做等值比较的，不能有空格
-        self.date_pat = re.compile(r'(?<=\s)(?:days|year|annual|quarterly|quarter|monthly|month)(?=\s)', re.IGNORECASE)
+        # self.month_pat = re.compile(r'(?<=\s)(?:months|monthly|month)(?=\s)', re.IGNORECASE)     # 需要做等值比较的，不能有空格
+        self.month_pat = re.compile(r'(?<=[ -])(?:|monthly|month)(?=[ -])', re.IGNORECASE)     # 需要做等值比较的，不能有空格
+        self.date_pat = re.compile(r'(?<=[ -])(?:days|year|annual|quarterly|quarter|monthly|month)(?=[ -])', re.IGNORECASE)
+
+        self.number_pat = re.compile(r'(?<=[ -])(?:one|two|three|four|five|six|seven|eight|nine|ten|'
+                                     r'eleven|twelve|thir|forty|'
+                                     r'first|second|fif|nin)', re.IGNORECASE)
+
         self.quarter_pat = r'quarter'
         self.annual_pat = r'annual'
         self.time_pat = r'(?:end|day)'
@@ -288,20 +294,28 @@ class InfoTools:
                 if content_words[s_pointer] == matched_keys[m_pointer]:
                     start = max(0, s_pointer - 10)
                     end = min(s_pointer + 10, total_length)
-                    # short_sen = ' '.join(content_words[start: end])
-                    # routine_key = self.routine_pat.search(short_sen)
-                    # if routine_key:
-                    #     routine_key = routine_key.group().strip()
-                    #     shorten_month_sen = content_words[start: end]
-                    #
-                    #     rk_index = shorten_month_sen.index(routine_key)
-                    #
-                    #     content_words[start + rk_index] = f'****{routine_key}****'
-                    #     content_words[s_pointer] = f'****{content_words[s_pointer]}****'
-                    #     shorten_month_sen[rk_index] = f'****{routine_key}****'
-                    #     shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
-                    #
-                    #     full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+                    # # short_sen = ' '.join(content_words[start: end])
+                    # # routine_key = self.routine_pat.search(short_sen)
+                    # # if routine_key:
+                    # #     routine_key = routine_key.group().strip()
+                    # #     shorten_month_sen = content_words[start: end]
+                    # #
+                    # #     rk_index = shorten_month_sen.index(routine_key)
+                    # #
+                    # #     content_words[start + rk_index] = f'****{routine_key}****'
+                    # #     content_words[s_pointer] = f'****{content_words[s_pointer]}****'
+                    # #     shorten_month_sen[rk_index] = f'****{routine_key}****'
+                    # #     shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
+                    # #
+                    # #     full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+
+                    # check if there number word in former 5 words,
+                    # if yes, pass this sentence
+                    tmp_former = ' '.join(content_words[max(0, s_pointer-3):s_pointer])
+                    if self.number_pat.search(tmp_former):
+                        break
+                    if re.search(r'\d{1,}', tmp_former):
+                        break
 
                     shorten_month_sen = content_words[start: end]
                     content_words[s_pointer] = f'****{content_words[s_pointer]}****'
