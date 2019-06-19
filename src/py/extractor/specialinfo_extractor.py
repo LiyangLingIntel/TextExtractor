@@ -29,17 +29,20 @@ class InfoTools:
         self.cont_pat = r'\s(?:report|financial statement)\s'
 
         self.routine_pat = re.compile(r'\s(?:each|every)\s', re.IGNORECASE)
-        self.fin_pat1 = re.compile(r'\s(?:financial_statement|financial_report|consolidated|consolidating|'
-                                   r'balance_sheet|cash_flow|income|earning|profit|revenue|sale|'
-                                   r'unaudited|audited)\s', re.IGNORECASE)
-        self.fin_pat2 = re.compile(r'EBIT|EBDIT|EPS')
+        self.fin_pat = re.compile(r'\s(?:financial_statement|financial_report|consolidated|consolidating|'
+                                  r'balance_sheet|cash_flow_statement|statement_of_cash_flow|income_statement|'
+                                  r'statement_of_income|unaudited|audited)\s', re.IGNORECASE)
+        # self.fin_pat2 = re.compile(r'EBIT|EBDIT|EPS')
         self.debt_pat = re.compile(r'bank|debt|loan|credit|borrow', re.IGNORECASE)
 
         # projection info
-        self.proj_pat = re.compile(r'budgeted|budgets|budget|projections|projected|projection|forecasted|'
-                                   r'forecast|anticipated|anticipations|anticipation|plans|plan', re.IGNORECASE)
-
-        # self.date_pat = re.compile(r'(?<=\s)(?:days|year|annual|quarterly|quarter|monthly|month)(?=\s)', re.IGNORECASE)
+        self.proj_pat = re.compile(r'\s(?:budgeted|budgets|budget|projections|projected|projection|forecasted|'
+                                   r'forecast|anticipated|anticipations|anticipation|plans|plan)', re.IGNORECASE)
+        self.plan_pat = re.compile(r'\s(?:stock|equity|equities|incentive|option|retire|retirement|pension|'
+                                   r'employee)', re.IGNORECASE)
+        # provide|deliver|delivery|report|prepare|submit|send|express|communicate|convey|direct|guide|assign|issue|grant
+        self.proj_conf_pat = re.compile(r'\s(?:provide|deliver|report|prepar|submit|send|express|communicat|'
+                                        r'convey|direct|guid|assign|issue|grant)\w*?\s', re.IGNORECASE)
 
     def get_duedate_sens(self, para: str) -> dict:
         """
@@ -182,61 +185,58 @@ class InfoTools:
         content = re.subn(r'balance sheet', 'balance_sheet', content)[0]
         content = re.subn(r'financial statement', 'financial_statement', content)[0]
         content = re.subn(r'financial report', 'financial_report', content)[0]
-        content = re.subn(r'cash flow', 'cash_flow', content)[0]
+        content = re.subn(r'cash flow statement', 'cash_flow_statement', content)[0]
+        content = re.subn(r'statement of cash flow', 'statement_of_cash_flow', content)[0]
+        content = re.subn(r'income statement', 'income_statement', content)[0]
+        content = re.subn(r'statement of income', 'statement_of_income', content)[0]
 
         def search_fin_keys(txt):
-            fin_keys_1 = [fk.strip() for fk in self.fin_pat1.findall(txt)]
-            fin_keys_2 = [fk.strip() for fk in self.fin_pat2.findall(txt)]
-            return fin_keys_1, fin_keys_2
+            # fin_keys_1 = [fk.strip() for fk in self.fin_pat1.findall(txt)]
+            # fin_keys_2 = [fk.strip() for fk in self.fin_pat2.findall(txt)]
+            # return fin_keys_1, fin_keys_2
+            fin_keys = [fk.strip() for fk in self.fin_pat.findall(txt)]
+            return fin_keys
 
         sens_res = []
 
-        fin_keys_1, fin_keys_2 = search_fin_keys(content)
+        # fin_keys_1, fin_keys_2 = search_fin_keys(content)
+        fin_keys = search_fin_keys(content)
 
         pter_content = 0
-        pter_fk_1 = 0
-        pter_fk_2 = 0
+        # pter_fk_1 = 0
+        # pter_fk_2 = 0
+        pter_fk = 0
 
         content_words = [wd.strip() for wd in content.split()]
         total_length = len(content_words)
-        while (pter_fk_1 < len(fin_keys_1) or pter_fk_2 < len(fin_keys_2)) and pter_content < total_length:
+        while pter_fk < len(fin_keys) and pter_content < total_length:
 
-            fk_1 = fin_keys_1[pter_fk_1] if pter_fk_1 < len(fin_keys_1) else ''
-            fk_2 = fin_keys_2[pter_fk_2] if pter_fk_2 < len(fin_keys_2) else ''
+            # fk_1 = fin_keys_1[pter_fk_1] if pter_fk_1 < len(fin_keys_1) else ''
+            # fk_2 = fin_keys_2[pter_fk_2] if pter_fk_2 < len(fin_keys_2) else ''
+            fk = fin_keys[pter_fk]
 
-            if content_words[pter_content] == fk_1 or content_words[pter_content] == fk_2:
+            # if content_words[pter_content] == fk_1 or content_words[pter_content] == fk_2:
+            if content_words[pter_content] == fk:
                 start = max(0, pter_content-interval)
                 end = min(total_length, pter_content+interval)
                 sentence = ' '.join(content_words[start: end])
-                tmp_fk_1, tmp_fk_2 = search_fin_keys((sentence))
+                tmp_fk = search_fin_keys(sentence)
 
                 # highlight key words
-                sentence = self.get_highlight_sen(tmp_fk_1, sentence)
-                sentence = self.get_highlight_sen(tmp_fk_2, sentence)
+                sentence = self.get_highlight_sen(tmp_fk, sentence)
                 sens_res.append(sentence)
 
                 # incease pointer index
                 # pter_content += end
-                # pter_fk_1 += len(tmp_fk_1)
-                # pter_fk_2 += len(tmp_fk_2)
-                pter_content += 1
-                pter_fk_1 += 1
-                pter_fk_2 += 1
-            else:
-                pter_content += 1
+                pter_fk += 1
+            pter_content += 1
 
         return sens_res
 
     def global_search_by_proj_key(self, content, interval) -> list:
 
-        # preprocessing
-        content = re.subn(r'balance sheet', 'balance_sheet', content)[0]
-        content = re.subn(r'financial statement', 'financial_statement', content)[0]
-        content = re.subn(r'financial report', 'financial_report', content)[0]
-        content = re.subn(r'cash flow', 'cash_flow', content)[0]
-
         def search_proj_keys(txt):
-            proj_keys = [pk.strip() for pk in self.proj_pat.findall(txt)]
+            proj_keys = [pro_k.strip() for pro_k in self.proj_pat.findall(txt)]
             return proj_keys
 
         sens_res = []
@@ -263,18 +263,25 @@ class InfoTools:
                 sens_res.append(sentence)
 
                 # incease pointer index
-                # pter_content += end
-                # pter_fk_1 += len(tmp_fk_1)
-                # pter_fk_2 += len(tmp_fk_2)
-                pter_content += 1
                 pter_pk += 1
-            else:
-                pter_content += 1
+            pter_content += 1
 
         return sens_res
 
     def global_filter_by_key(self, content_list, pattern) -> list:
 
+        def find_plan_conf(src_list, word):
+            try:
+                
+                idx = src_list.index(word)
+                start = max(0, idx - 5)
+                end = min(idx + 5, len(content_words))
+                if self.plan_pat.search(' '.join(content_words[start:end])):
+                    return False
+                else:
+                    return True
+            except:
+                return True
 
         full_shorten_res = []
 
@@ -289,44 +296,54 @@ class InfoTools:
             s_pointer = 0
             m_pointer = 0
 
-            while m_pointer < len(matched_keys) and s_pointer < total_length:
+            if pattern == 'month_pat':
+                while m_pointer < len(matched_keys) and s_pointer < total_length:
+                    if content_words[s_pointer] == matched_keys[m_pointer]:
+                        start = max(0, s_pointer - 10)
+                        end = min(s_pointer + 10, total_length)
+                        # check if there number word in former 5 words,
+                        # if yes, pass this sentence
+                        tmp_former = ' '.join(content_words[max(0, s_pointer-3):s_pointer])
+                        if self.number_pat.search(tmp_former):
+                            break
+                        if re.search(r'\d{1,}', tmp_former):
+                            break
 
-                if content_words[s_pointer] == matched_keys[m_pointer]:
-                    start = max(0, s_pointer - 10)
-                    end = min(s_pointer + 10, total_length)
-                    # # short_sen = ' '.join(content_words[start: end])
-                    # # routine_key = self.routine_pat.search(short_sen)
-                    # # if routine_key:
-                    # #     routine_key = routine_key.group().strip()
-                    # #     shorten_month_sen = content_words[start: end]
-                    # #
-                    # #     rk_index = shorten_month_sen.index(routine_key)
-                    # #
-                    # #     content_words[start + rk_index] = f'****{routine_key}****'
-                    # #     content_words[s_pointer] = f'****{content_words[s_pointer]}****'
-                    # #     shorten_month_sen[rk_index] = f'****{routine_key}****'
-                    # #     shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
-                    # #
-                    # #     full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+                        shorten_month_sen = content_words[start: end]
+                        content_words[s_pointer] = f'****{content_words[s_pointer]}****'
+                        shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
+                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
 
-                    # check if there number word in former 5 words,
-                    # if yes, pass this sentence
-                    tmp_former = ' '.join(content_words[max(0, s_pointer-3):s_pointer])
-                    if self.number_pat.search(tmp_former):
-                        break
-                    if re.search(r'\d{1,}', tmp_former):
-                        break
+                        m_pointer += 1
+                    s_pointer += 1
 
-                    shorten_month_sen = content_words[start: end]
-                    content_words[s_pointer] = f'****{content_words[s_pointer]}****'
-                    shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
-                    full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+            elif pattern == 'date_pat':
 
-                    m_pointer += 1
-                s_pointer += 1
+                proj_conf_keys = self.proj_conf_pat.findall(content)
+                if not proj_conf_keys:
+                    break
+                if not find_plan_conf(content_words, 'plan'):
+                    break
+                if not find_plan_conf(content_words, 'plans'):
+                    break
 
+                for pck in proj_conf_keys:
+                    pck = pck.strip()
+                    content = content.replace(pck, f' ****{pck}**** ')
+                    content_words = content.split()
+
+                while m_pointer < len(matched_keys) and s_pointer < total_length:
+                    if content_words[s_pointer] == matched_keys[m_pointer]:
+                        start = max(0, s_pointer - 10)
+                        end = min(s_pointer + 10, total_length)
+
+                        shorten_month_sen = content_words[start: end]
+                        content_words[s_pointer] = f'****{content_words[s_pointer]}****'
+                        shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
+                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+                        m_pointer += 1
+                    s_pointer += 1
         return full_shorten_res
-
 
 # if __name__ == '__main__':
 #
