@@ -38,11 +38,12 @@ class InfoTools:
         # projection info
         self.proj_pat = re.compile(r'\s(?:budgeted|budgets|budget|projections|projected|projection|forecasted|'
                                    r'forecast|anticipated|anticipations|anticipation|plans|plan)', re.IGNORECASE)
-        self.plan_pat = re.compile(r'\s(?:stock|equity|equities|incentive|option|retire|retirement|pension|'
-                                   r'employee)', re.IGNORECASE)
-        # provide|deliver|delivery|report|prepare|submit|send|express|communicate|convey|direct|guide|assign|issue|grant
-        self.proj_conf_pat = re.compile(r'\s(?:provide|deliver|report|prepar|submit|send|express|communicat|'
-                                        r'convey|direct|guid|assign|issue|grant)\w*?\s', re.IGNORECASE)
+        # stock, equity, incentive, option, retire,retirement,pension,employee,benefit,employer
+        self.plan_fit_pat = re.compile(r'\s(?:stock|equity|equitie|incentive|option|retire|retirement|pension|'
+                                   r'employee|employer|benefit)s?\s', re.IGNORECASE)
+        # provide, deliver, delivery, report, prepare, submit, send, express, convey,  issue
+        self.proj_conf_pat = re.compile(r'\s(?:provid|deliver|delivery|report|prepar|submit|send|sent|express|'
+                                        r'convey|issue)(?:e|ed|s|es|ing)?\s', re.IGNORECASE)
 
     def get_duedate_sens(self, para: str) -> dict:
         """
@@ -159,7 +160,6 @@ class InfoTools:
                         name, is_original, first_lines, shorten_sen, due_date_sen
         :return: sheet object, next row number
         """
-
         matched_sens = content.pop('matched_sens', None)
         if matched_sens:
             for sen, short_sen in set(matched_sens):
@@ -270,18 +270,19 @@ class InfoTools:
 
     def global_filter_by_key(self, content_list, pattern) -> list:
 
-        def find_plan_conf(src_list, word):
+        def filter_plan_conf(src_list, word):
             try:
-                
-                idx = src_list.index(word)
-                start = max(0, idx - 5)
-                end = min(idx + 5, len(content_words))
-                if self.plan_pat.search(' '.join(content_words[start:end])):
-                    return False
-                else:
-                    return True
+                words = re.findall(word, ' '.join(src_list))
+                idx = -1        # will be increased by 1, to make it be 0 at beginning
+                for i in words:
+                    idx = src_list.index(word, idx+1)
+                    start = max(0, idx - 5)
+                    end = min(idx + 6, len(content_words))
+                    if self.plan_fit_pat.search(' '.join(src_list[start:end])):
+                        return True
+                return False
             except:
-                return True
+                return False
 
         full_shorten_res = []
 
@@ -322,15 +323,15 @@ class InfoTools:
                 proj_conf_keys = self.proj_conf_pat.findall(content)
                 if not proj_conf_keys:
                     break
-                if not find_plan_conf(content_words, 'plan'):
+                if filter_plan_conf(content_words, 'plan'):
                     break
-                if not find_plan_conf(content_words, 'plans'):
+                if filter_plan_conf(content_words, 'plans'):
                     break
 
-                for pck in proj_conf_keys:
+                for pck in set(proj_conf_keys):
                     pck = pck.strip()
                     content = content.replace(pck, f' ****{pck}**** ')
-                    content_words = content.split()
+                content_words = content.split()
 
                 while m_pointer < len(matched_keys) and s_pointer < total_length:
                     if content_words[s_pointer] == matched_keys[m_pointer]:

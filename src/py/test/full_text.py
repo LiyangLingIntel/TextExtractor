@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     year_file_dic = {}
     years = [1996, 2018]
-    for year in range(*years)[-1:]:
+    for year in range(*years):
         year_folder = os.path.join(text_folder, str(year))
         year_file_dic[year] = [file for file in os.listdir(year_folder) if file.endswith('.txt')]
 
