@@ -26,13 +26,13 @@ if __name__ == '__main__':
     types = ['basic', 'duedate', 'proj']
     headers = {}
     headers['basic'] = ['name', 'is_original', 'is_debt', 'first_lines']
-    headers['duedate'] = ['name', 'shorten_sen', 'due_date_sen']
-    headers['proj'] = ['name', 'shorten_sen', 'projection_sen']
+    headers['duedate'] = ['name', 'shorten_sen', 'is_new', 'due_date_sen']
+    headers['proj'] = ['name', 'shorten_sen', 'is_new', 'projection_sen']
     books = {}
     sheets = {}
     row_counter = {}
 
-    for year, file_names in tuple(year_file_dic.items()):
+    for year, file_names in tuple(year_file_dic.items())[1:]:
 
         # 初始化excel workbook，否则信息会累加到后面的文件中
         for t in types:

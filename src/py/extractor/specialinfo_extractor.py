@@ -162,13 +162,14 @@ class InfoTools:
         """
         matched_sens = content.pop('matched_sens', None)
         if matched_sens:
-            for sen, short_sen in set(matched_sens):
+            for sen, short_sen, is_new in matched_sens:
                 # re-clean
                 sen = re.subn(r'[-= ]{5,}', '', sen)[0]
 
                 sheet.write(row, 0, content['name'])
                 sheet.write(row, 1, short_sen)
-                sheet.write(row, 2, sen)
+                sheet.write(row, 2, is_new)
+                sheet.write(row, 3, sen)
                 row += 1
         else:
             # re-clean first lines
@@ -288,6 +289,7 @@ class InfoTools:
 
         for content in content_list:
 
+            is_new = 'TRUE'
             matched_keys = getattr(self, pattern).findall(content)
             if not matched_keys:
                 continue
@@ -313,7 +315,8 @@ class InfoTools:
                         shorten_month_sen = content_words[start: end]
                         content_words[s_pointer] = f'****{content_words[s_pointer]}****'
                         shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
-                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen), is_new))
+                        is_new = ' '
 
                         m_pointer += 1
                     s_pointer += 1
@@ -341,7 +344,9 @@ class InfoTools:
                         shorten_month_sen = content_words[start: end]
                         content_words[s_pointer] = f'****{content_words[s_pointer]}****'
                         shorten_month_sen[s_pointer - start] = f'****{matched_keys[m_pointer]}****'
-                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen)))
+                        full_shorten_res.append((' '.join(content_words), ' '.join(shorten_month_sen), is_new))
+                        is_new = ' '
+
                         m_pointer += 1
                     s_pointer += 1
         return full_shorten_res
