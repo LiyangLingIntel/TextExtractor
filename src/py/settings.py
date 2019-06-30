@@ -1,6 +1,5 @@
 
 import os
-import time
 
 os.chdir('/Users/liyangling/workspace/Projects/Python/RA_NLP')
 resource_folder = './text/'

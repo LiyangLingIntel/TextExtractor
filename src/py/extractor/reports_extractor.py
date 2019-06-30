@@ -3,7 +3,6 @@
 import os
 import re
 import nltk
-from py.settings import resource_folder, cove_folder, output_folder
 
 
 class ReportTools:
@@ -21,8 +20,6 @@ def reports_para():
 def split_para(text: str) -> str:
     """
     put sentences in the same paragraph to the same line
-    :param text:
-    :return:
     """
     paras = re.subn(r'([^;:.?!])\n', ' ', text)[0]
     paras = re.subn(r' +', ' ', paras)[0]
@@ -30,6 +27,9 @@ def split_para(text: str) -> str:
 
 
 def indent_para(text: str) -> str:
+    """
+    re-indent paragraphs of full text
+    """
     pass
 
 

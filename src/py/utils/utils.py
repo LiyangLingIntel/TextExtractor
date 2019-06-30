@@ -1,3 +1,7 @@
+"""
+Project Utilities
+"""
+
 import re
 import os
 import nltk
@@ -7,6 +11,11 @@ def find_files_with_postfix(root: str, postfox: str = 'txt') -> list:
 
     file_list = [file for file in os.listdir(root) if file.endswith(f'.{postfox}')]
     return file_list
+
+
+def search_keys_in_sen(pattern, sentence):
+    keys = [result.strip() for result in pattern.findall(sentence)]
+    return keys
 
 
 def num_roman(num: int) -> str:

@@ -2,7 +2,6 @@ import os
 import re
 import json
 
-from py.settings import resource_folder, cove_folder, toc_folder, text_folder, truncated_cove_folder
 from py.utils import roman_num, num_roman
 from timeout_decorator import timeout
 
@@ -40,21 +39,26 @@ class ConvenantTools:
 
     @timeout(5)
     def toc_extractor(self, text: str) -> str:
+        """
+        extract table of content from given contract text
+        """
 
         toc = re.findall(self.toc_line_pat, text)
         return ''.join(toc)
 
     @timeout(10)
     def covenant_title_finder(self, toc: str) -> list:
-
+        """
+        find all covenant titles in table of content
+        """
         title_list = []
         last_num = 0
 
         for toc_section in re.finditer(self.toc_pat, toc):
             toc_section = toc_section.group(0)
-            title_matched = re.search(self.title_pat, toc_section)    # definitely successful, cos of the similar regex with toc_section
+            title_matched = re.search(self.title_pat, toc_section)
 
-            # toc extracted is not clean, below is to garantee only match content part
+            # toc extracted is not clean, below is to guarantee only matching content part
             title_num = title_matched.group(2)
             current_num = roman_num(title_num ) if title_num.isalpha() else int(title_num)
 
@@ -74,9 +78,11 @@ class ConvenantTools:
 
         return title_list
 
-    # extract covenant section according to its main section title
     @timeout(10)
     def section_extractor(self, title_list: list, text: str) -> str:
+        """
+        extract covenant section according to its main section title
+        """
 
         if not isinstance(title_list, list):
             title_list = [title_list]
